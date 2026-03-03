@@ -1,10 +1,10 @@
 # --- [1. 필요한 도구 가져오기] ---
-import omni.isaac.core.utils.prims as prim_utils
-from omni.isaac.core import World
-from omni.isaac.core.objects import FixedCuboid, DynamicSphere
 import numpy as np
 from isaacsim import SimulationApp
 simulation_app = SimulationApp({"headless": False})
+import omni.isaac.core.utils.prims as prim_utils
+from omni.isaac.core import World
+from omni.isaac.core.objects import FixedCuboid, DynamicSphere
 from scipy.spatial.transform import Rotation as R
 
 # --- [2. 완벽한 초기화 (Script Editor 에러 방지 쉴드)] ---
@@ -75,6 +75,8 @@ world.scene.add(
 
 # --- [6. 물리 엔진 실행] ---
 world.reset()
+for j in range(1000):
+    world.step(render=True)
 world.play()
 
 print("초대형 슬라이드 완성! 넓고 긴 장애물을 타고 공이 안전하게 내려갑니다!")
