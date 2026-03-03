@@ -2,6 +2,8 @@ import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.core import World
 from omni.isaac.core.objects import DynamicCuboid, DynamicSphere
 import numpy as np
+from isaacsim import SimulationApp
+simulation_app = SimulationApp({"headless": False})
 from scipy.spatial.transform import Rotation as R
 
 # 가상 세계 설정 및 씬 초기화

@@ -3,6 +3,8 @@ import omni.isaac.core.utils.prims as prim_utils
 from omni.isaac.core import World
 from omni.isaac.core.objects import FixedCuboid, DynamicSphere
 import numpy as np
+from isaacsim import SimulationApp
+simulation_app = SimulationApp({"headless": False})
 from scipy.spatial.transform import Rotation as R
 
 # --- [2. 완벽한 초기화 (Script Editor 에러 방지 쉴드)] ---
