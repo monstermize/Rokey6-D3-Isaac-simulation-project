@@ -67,12 +67,12 @@ for i in range(4):
         car.set_joint_velocities([[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]])
         
     elif i == 1:
-        print("turning left")
+        print("turning right")
         arm.set_joint_positions([[0.0, -1.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.04, 0.04]])
         car.set_joint_velocities([[1.0, 2.0, 1.0, 2.0, 1.0, 1.0, 1.0]])
         
     elif i == 2:
-        print("turning right")
+        print("turning left")
         arm.set_joint_positions([[1.5, 0.5, 0.0, -0.5, 0.0, 0.5, 0.0, 0.0, 0.0]])
         car.set_joint_velocities([[4.0, 2.0, 4.0, 1.0, 1.0, 1.0, 1.0]])
         
