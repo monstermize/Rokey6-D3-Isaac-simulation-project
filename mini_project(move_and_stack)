@@ -1,0 +1,208 @@
+import numpy as np
+import sys
+import carb
+
+from isaacsim.examples.interactive.base_sample import BaseSample
+
+from isaacsim.core.utils.stage import add_reference_to_stage
+from isaacsim.storage.native import get_assets_root_path
+from isaacsim.robot.manipulators.grippers import SurfaceGripper
+from isaacsim.robot.manipulators import SingleManipulator
+from isaacsim.core.api.objects import DynamicCuboid
+
+import isaacsim.robot_motion.motion_generation as mg
+from isaacsim.core.utils.rotations import euler_angles_to_quat
+from isaacsim.core.prims import SingleArticulation
+
+
+class RMPFlowController(mg.MotionPolicyController):
+    def __init__(
+        self,
+        name: str,
+        robot_articulation: SingleArticulation,
+        physics_dt: float = 1.0 / 60.0,
+        attach_gripper: bool = False,
+    ) -> None:
+        if attach_gripper:
+            self.rmp_flow_config = mg.interface_config_loader.load_supported_motion_policy_config(
+                "UR10", "RMPflowSuction"
+            )
+        else:
+            self.rmp_flow_config = mg.interface_config_loader.load_supported_motion_policy_config("UR10", "RMPflow")
+        self.rmp_flow = mg.lula.motion_policies.RmpFlow(**self.rmp_flow_config)
+
+        self.articulation_rmp = mg.ArticulationMotionPolicy(robot_articulation, self.rmp_flow, physics_dt)
+
+        mg.MotionPolicyController.__init__(self, name=name, articulation_motion_policy=self.articulation_rmp)
+        (
+            self._default_position,
+            self._default_orientation,
+        ) = self._articulation_motion_policy._robot_articulation.get_world_pose()
+        self._motion_policy.set_robot_base_pose(
+            robot_position=self._default_position, robot_orientation=self._default_orientation
+        )
+        return
+
+    def reset(self):
+        mg.MotionPolicyController.reset(self)
+        self._motion_policy.set_robot_base_pose(
+            robot_position=self._default_position, robot_orientation=self._default_orientation
+        )
+
+
+class Gripper_UR10(BaseSample):
+    def __init__(self) -> None:
+        super().__init__()
+        self.task_phase = 1
+        return
+
+    def setup_scene(self):
+        world = self.get_world()
+        world.scene.add_default_ground_plane()    
+
+        assets_root_path = get_assets_root_path()
+        if assets_root_path is None:
+            carb.log_error("Could not find Isaac Sim assets folder")
+            sys.exit()
+        
+        # UR10 로봇 생성
+        asset_path = assets_root_path + "/Isaac/Robots/UniversalRobots/ur10/ur10.usd"
+        robot = add_reference_to_stage(usd_path=asset_path, prim_path="/World/UR10")
+        robot.GetVariantSet("Gripper").SetVariantSelection("Short_Suction")
+        gripper = SurfaceGripper(
+            end_effector_prim_path="/World/UR10/ee_link", surface_gripper_path="/World/UR10/ee_link/SurfaceGripper"
+        )
+        ur10 = world.scene.add(
+            SingleManipulator(
+                prim_path="/World/UR10", name="my_ur10", end_effector_prim_path="/World/UR10/ee_link", gripper=gripper
+            )
+        )
+        ur10.set_joints_default_state(positions=np.array([-np.pi / 2, -np.pi / 2, -np.pi / 2, -np.pi / 2, np.pi / 2, 0]))
+        
+        # --- [수정 포인트 1] 3개의 색상 블록 나란히 생성 ---
+        colors = {"red": [1.0, 0.0, 0.0], "green": [0.0, 1.0, 0.0], "blue": [0.0, 0.0, 1.0]}
+        y_positions = [-0.2, 0.0, 0.2] # y축으로 나란히 배치
+
+        for i, (name, color) in enumerate(colors.items()):
+            world.scene.add(DynamicCuboid(
+                prim_path=f"/World/{name}_cube", 
+                name=f"{name}_cube",
+                position=np.array([0.40, y_positions[i], 0.025]), 
+                scale=np.array([0.05, 0.05, 0.05]), 
+                color=np.array(color)
+            ))
+        return
+
+    async def setup_post_load(self):
+        self._world = self.get_world()
+        self.robots = self._world.scene.get_object("my_ur10")
+        
+        # 3개의 큐브를 리스트로 관리합니다.
+        self._cubes = [
+            self._world.scene.get_object("red_cube"),
+            self._world.scene.get_object("green_cube"),
+            self._world.scene.get_object("blue_cube")
+        ]
+        
+        self.cspace_controller = RMPFlowController(name="my_ur10_cspace_controller", robot_articulation=self.robots, attach_gripper=True)
+        
+        # 로직 관리를 위한 변수 초기화
+        self.task_phase = 1
+        self._goal_reached = False
+        self.wait_steps = 0
+        self.current_cube_idx = 0  # 0: 빨강, 1: 초록, 2: 파랑
+        
+        # 목표 쌓기 위치 (x, y 좌표)
+        self.stack_target_pos = np.array([0.3, 0.4]) 
+
+        self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
+        await self._world.play_async()
+        return
+
+    def move_point(self, goal_position: np.ndarray, end_effector_orientation: np.ndarray=np.array([0, np.pi/2, 0])) -> bool:
+        end_effector_orientation = euler_angles_to_quat(end_effector_orientation)
+        target_joint_positions = self.cspace_controller.forward(
+            target_end_effector_position=goal_position, 
+            target_end_effector_orientation=end_effector_orientation
+        )
+        self.robots.apply_action(target_joint_positions)
+        current_joint_positions = self.robots.get_joint_positions()
+        is_reached = np.all(np.abs(current_joint_positions[:7] - target_joint_positions.joint_positions) < 0.001)
+        return is_reached
+
+    def physics_step(self, step_size):
+        # 3개의 블록을 다 쌓았다면 로직 종료
+        if self.current_cube_idx >= 3:
+            return
+
+        # 현재 옮겨야 할 큐브 선택
+        current_cube = self._cubes[self.current_cube_idx]
+
+        # Phase 1: 블록을 잡기 위해 해당 블록 위치로 이동
+        if self.task_phase == 1:
+            cube_position, _ = current_cube.get_world_pose()
+            cube_position[2] = 0.045 # 흡착을 위한 높이
+
+            self._goal_reached = self.move_point(cube_position)
+            if self._goal_reached:
+                self.cspace_controller.reset()
+                self.task_phase = 2
+
+        # Phase 2: 그리퍼 닫기 (흡착 시작)
+        elif self.task_phase == 2:
+            self.robots.gripper.close()
+            self.wait_steps = 0
+            self.task_phase = 3
+
+        # Phase 3: 흡착이 완전히 될 때까지 잠시 대기
+        elif self.task_phase == 3:
+            self.wait_steps += 1
+            if self.wait_steps > 15:
+                self.task_phase = 4
+
+        # Phase 4: 블록을 잡고 안전한 높이로 들어 올리기 (이동 중 충돌 방지)
+        elif self.task_phase == 4:
+            cube_position, _ = current_cube.get_world_pose()
+            cube_position[2] = 0.35 # 높게 들어 올림
+
+            self._goal_reached = self.move_point(cube_position)
+            if self._goal_reached:
+                self.cspace_controller.reset()
+                self.task_phase = 5
+
+        # Phase 5: 목표 쌓기 위치로 이동 (현재 인덱스에 따라 놓는 높이가 0.05씩 증가함)
+        elif self.task_phase == 5:
+            # 기본 높이 0.045 + (블록 크기 0.05 * 현재 블록 순서)
+            target_z = 0.045 + (0.05 * self.current_cube_idx)
+            drop_pos = np.array([self.stack_target_pos[0], self.stack_target_pos[1], target_z])
+
+            self._goal_reached = self.move_point(drop_pos)
+            if self._goal_reached:
+                self.cspace_controller.reset()
+                self.task_phase = 6
+
+        # Phase 6: 그리퍼 열기 (블록 놓기)
+        elif self.task_phase == 6:
+            self.robots.gripper.open()
+            self.wait_steps = 0
+            self.task_phase = 7
+
+        # Phase 7: 블록이 자리를 잡을 때까지 잠시 대기
+        elif self.task_phase == 7:
+            self.wait_steps += 1
+            if self.wait_steps > 30:
+                self.task_phase = 8
+
+        # Phase 8: 놓은 위치에서 위로 쭉 빠져나온 뒤, 다음 블록으로 넘어가기
+        elif self.task_phase == 8:
+            retreat_pos = np.array([self.stack_target_pos[0], self.stack_target_pos[1], 0.35])
+            
+            self._goal_reached = self.move_point(retreat_pos)
+            if self._goal_reached:
+                self.cspace_controller.reset()
+                
+                # 다음 블록으로 인덱스 증가시키고 다시 Phase 1로 돌아감
+                self.current_cube_idx += 1
+                self.task_phase = 1
+                
+        return
