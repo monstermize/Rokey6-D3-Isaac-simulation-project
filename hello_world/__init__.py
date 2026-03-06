@@ -52,3 +52,6 @@ from isaacsim.examples.interactive.hello_world.move_joint_interpolated_ur10_exte
 
 from isaacsim.examples.interactive.hello_world.gripper_ur10 import Gripper_UR10
 from isaacsim.examples.interactive.hello_world.gripper_ur10_extension import Gripper_UR10Extension
+
+from isaacsim.examples.interactive.hello_world.ur10_conveyor import UR10_Conveyor
+from isaacsim.examples.interactive.hello_world.ur10_conveyor_extension import UR10_ConveyorExtension
