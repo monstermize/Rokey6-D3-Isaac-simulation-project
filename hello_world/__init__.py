@@ -55,3 +55,6 @@ from isaacsim.examples.interactive.hello_world.gripper_ur10_extension import Gri
 
 from isaacsim.examples.interactive.hello_world.ur10_conveyor import UR10_Conveyor
 from isaacsim.examples.interactive.hello_world.ur10_conveyor_extension import UR10_ConveyorExtension
+
+from isaacsim.examples.interactive.hello_world.move_jetbot import Move_Jetbot
+from isaacsim.examples.interactive.hello_world.move_jetbot_extension import Move_JetbotExtension
