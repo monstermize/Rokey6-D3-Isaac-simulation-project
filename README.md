@@ -28,7 +28,7 @@
 코드를 실행하기 전 아래 환경이 구성되어 있어야 합니다.
 * Ubuntu 22.04
 * ROS 2 Humble
-* NVIDIA Isaac Sim
+* NVIDIA Isaac Sim 5.0
 * Python 주요 패키지: rclpy, opencv-python, numpy, matplotlib, networkx
 
 ## 🚀 실행 방법 (Usage)
