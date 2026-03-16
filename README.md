@@ -59,6 +59,8 @@
         └── assets/
         
 ### assets은 https://github.com/NVIDIA-Omniverse/sample-ackermann-amr/tree/main 에서 다운
+### map.zip은 /resource 안에 압축해제
+
 ---
 
 ## 💻 개발 환경 (Environment)
