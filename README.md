@@ -57,7 +57,8 @@
         ├── map.usd
         ├── ackermann_car_fixed_cam.usd
         └── assets/
-
+        
+# assets은 https://github.com/NVIDIA-Omniverse/sample-ackermann-amr/tree/main 에서 다운
 ---
 
 ## 💻 개발 환경 (Environment)
